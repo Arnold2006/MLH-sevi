@@ -64,6 +64,14 @@ function str(formData: FormData, key: string, max = 500): string {
     .slice(0, max);
 }
 
+function parsePosition(raw: string): string | null {
+  const m = raw.trim().match(/^(\d{1,3})%?\s+(\d{1,3})%?$/);
+  if (!m) return null;
+  const x = Math.max(0, Math.min(100, Number(m[1])));
+  const y = Math.max(0, Math.min(100, Number(m[2])));
+  return `${x}% ${y}%`;
+}
+
 export interface SaveState {
   ok?: boolean;
   error?: string;
@@ -86,9 +94,11 @@ export async function saveSettings(
     heroHeadline: str(formData, "heroHeadline", 200) || current.heroHeadline,
     heroSubtext: str(formData, "heroSubtext", 600),
     heroImage: str(formData, "heroImage", 300) || current.heroImage,
+    heroImagePosition: parsePosition(str(formData, "heroImagePosition", 20)) || current.heroImagePosition || "50% 50%",
     aboutHeadline: str(formData, "aboutHeadline", 200),
     aboutText: str(formData, "aboutText", 8000),
     aboutImage: str(formData, "aboutImage", 300) || current.aboutImage,
+    aboutImagePosition: parsePosition(str(formData, "aboutImagePosition", 20)) || current.aboutImagePosition || "50% 50%",
     statYears: str(formData, "statYears", 20),
     statJobs: str(formData, "statJobs", 20),
     ctaHeadline: str(formData, "ctaHeadline", 200),

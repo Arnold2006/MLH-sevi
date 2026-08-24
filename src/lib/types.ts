@@ -9,9 +9,11 @@ export interface SiteSettings {
   heroHeadline: string;
   heroSubtext: string;
   heroImage: string;
+  heroImagePosition: string;
   aboutHeadline: string;
   aboutText: string;
   aboutImage: string;
+  aboutImagePosition: string;
   statYears: string;
   statJobs: string;
   ctaHeadline: string;

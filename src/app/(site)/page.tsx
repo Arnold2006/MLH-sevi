@@ -70,6 +70,7 @@ export default async function HomePage() {
               width={1200}
               height={900}
               className="aspect-[4/3] w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/10"
+              style={{ objectPosition: site.heroImagePosition || "50% 50%" }}
             />
             <div className="absolute -bottom-6 left-4 flex items-center gap-3 rounded-xl bg-white p-4 shadow-xl sm:left-8">
               <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
@@ -171,6 +172,7 @@ export default async function HomePage() {
               width={1000}
               height={1150}
               className="aspect-[4/3] w-full rounded-2xl object-cover shadow-lg"
+              style={{ objectPosition: site.aboutImagePosition || "50% 50%" }}
             />
             <div className="absolute -right-3 -bottom-6 rounded-xl bg-amber-500 px-5 py-4 text-white shadow-lg sm:right-6">
               <p className="text-2xl font-extrabold">{site.statYears}</p>
