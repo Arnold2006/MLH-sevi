@@ -25,6 +25,7 @@ export default async function AboutPage() {
               width={1000}
               height={1150}
               className="aspect-[4/5] w-full rounded-2xl object-cover shadow-lg sm:aspect-[4/3] lg:aspect-[4/5]"
+              style={{ objectPosition: site.aboutImagePosition || "50% 50%" }}
             />
             <div className="absolute -right-3 -bottom-6 rounded-xl bg-amber-500 px-5 py-4 text-white shadow-lg sm:right-6">
               <p className="text-2xl font-extrabold">{site.statYears}</p>
