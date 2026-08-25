@@ -1,10 +1,25 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { submitContact, type ContactFormState } from "@/app/(site)/contact/actions";
 import { CheckIcon } from "@/components/icons";
 
 const initial: ContactFormState = { ok: false };
+
+function TurnstileWidget() {
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  useEffect(() => {
+    if (!siteKey) return;
+    if (document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')) return;
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    s.async = true;
+    s.defer = true;
+    document.head.appendChild(s);
+  }, [siteKey]);
+  if (!siteKey) return null;
+  return <div className="cf-turnstile" data-sitekey={siteKey} data-theme="light" />;
+}
 
 export default function ContactFlow() {
   const [instance, setInstance] = useState(0);
@@ -93,17 +108,17 @@ function ContactForm({ onReset }: { onReset: () => void }) {
       />
       <div aria-hidden="true" className="hidden">
         <label htmlFor="company">Lad dette felt stå tomt</label>
-        <input
-          id="company"
-          name="company"
-          type="text"
-          tabIndex={-1}
-          autoComplete="off"
-        />
+        <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
       </div>
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label htmlFor="website">Hjemmeside</label>
+        <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+      </div>
+      <TurnstileWidget />
       <button type="submit" disabled={pending} className="btn btn-primary w-full sm:w-auto">
         {pending ? "Sender…" : "Send besked"}
       </button>
+      <p className="text-xs text-slate-400">Beskyttet mod spam — ingen data deles med tredjepart uden Turnstile.</p>
     </form>
   );
 }
