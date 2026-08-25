@@ -1,3 +1,124 @@
+# Project Audit — 25 August 2026 — Security + Data (password included)
+
+**Date:** 25 August 2026
+**Scope:** Security + data only, per owner request. Covers auth/session, password storage (including `data/password.json` by design), throttling, contact spam controls, JSON persistence, upload handling, media orphan detection, backup, and security headers. UI/performance/accessibility excluded by scope.
+**Commit:** `3641cdf` → `6695ecb` (master, after PR #8 backup) — `src/lib/auth.ts:1`, `src/lib/db.ts:12`, `src/lib/storage.ts:1`, `src/lib/media.ts:1`, `src/app/api/backup/route.ts:1`, `src/app/api/unread/route.ts:1`, `next.config.ts:3`
+**Method:** Static review of all source files in scope, greps for auth coverage and secrets, `npm run build` + `GET /api/unread` + `GET /api/backup` probes, `data/*.json` + `public/uploads` inspection. Password intentionally included in backup per owner confirmation.
+
+---
+
+## Executive summary
+
+Previous high fixes remain sound (`src/lib/auth.ts:68` HMAC + `timingSafeEqual`, `src/lib/login-throttle.ts:8` 5/10m→15m, `src/lib/storage.ts:15` magic-sniff, `next.config.ts:12` HSTS). The application is production-ready for its threat model (single owner, HAProxy TLS termination, single-instance Node) after rotating `ADMIN_PASSWORD`/`ADMIN_SECRET` and ensuring HAProxy sets `X-Forwarded-Proto: https`.
+
+New residual risks are operational: in-memory throttles and `load→modify→save` races (`src/lib/db.ts:38`), non-atomic image writes (`src/lib/storage.ts:59`), and memory-buffered backup (`src/app/api/backup/route.ts:50`). Severity: **0 critical · 2 high · 5 medium · 4 low** (all medium/low are mitigated by the deployment documented in `README.md`).
+
+Password inclusion is **by design**: `src/app/api/backup/route.ts:21` zips `data/password.json` (sha256 unsalted `src/lib/auth.ts:39`). Documented below with at-rest handling guidance.
+
+---
+
+## Findings — Security
+
+### HIGH
+
+#### H1 — In-memory throttles and spoofable `X-Forwarded-For`
+`src/lib/login-throttle.ts:7` `Map`, `src/lib/contact-throttle.ts:3` `Map`, keyed by `headers().get("x-forwarded-for")?.split(",")[0]` `src/app/admin/actions.ts:37`, `src/app/(site)/contact/actions.ts:22`, `src/lib/auth.ts:90`. Lost on restart/cold start, not shared across workers. `XFF` is client-controllable unless HAProxy overwrites/cleans — attacker can rotate IP per 5 tries to bypass 5/10m→15m. `"lokal"` fallback coalesces all empty-header attempts.
+**Fix:** Persist throttles to file/Redis or enforce at HAProxy/fail2ban; sanitize `XFF` to last proxy-added entry; consider `request.ip` behind trusted proxy.
+
+#### H2 — Stateless 7-day session, no revocation, fast unsalted hash
+`src/lib/auth.ts:8` `SESSION_MS=7*24*60*60*1000`, `src/lib/auth.ts:68` `sign(payload)=HMAC-SHA256(secret).update(expires).hex`, `src/lib/auth.ts:30` `createSessionToken()`, `src/lib/auth.ts:103` `store.set(..., httpOnly:true, sameSite:"lax", secure:isHttps)`. No server-side jti/nonce; `endSession()` `src/lib/auth.ts:108` only deletes client cookie — stolen token valid until expiry. `src/lib/auth.ts:39` `hashOf=sha256(input)` unsalted, fast; `src/lib/auth.ts:23` `/^[a-f0-9]{64}$/` stored hex in `data/password.json` enables offline brute-force if zip leaks. Dual-password design `src/lib/auth.ts:43` means `ADMIN_PASSWORD` from `.env` always works alongside ejer hash — intentional recovery backdoor (`README.md:72`), but must be audited.
+**Fix:** Shorten `SESSION_MS` to 24h + rotate on activity, add jti store in `data/` for revocation; migrate stored hash to `bcrypt`/`argon2` with salt (keep env fallback for recovery); document `data/password.json` at-rest encryption for backup.
+
+### MEDIUM
+
+#### M1 — `Secure` flag trusts `X-Forwarded-Proto` unconditionally
+`src/lib/auth.ts:93` `isHttps=NODE_ENV==="production"` overridden `src/lib/auth.ts:97` `if(proto) isHttps=proto==="https"` from `x-forwarded-proto`/`x-forwarded-protocol` `src/lib/auth.ts:90`. Correct behind HAProxy setting `X-Forwarded-Proto: https` on `VIP:443` and `301` on `VIP:80` (per `README.md`), but direct `http://:3000` bypass with stripped header falls back to `NODE_ENV` — still `Secure` in prod, `false` in dev. No `__Host-` prefix.
+**Fix:** Network-block direct `:3000`; optionally add `__Host-` prefix with `path=/` (already `path:/` `src/lib/auth.ts:99`).
+
+#### M2 — No `Content-Security-Policy`, unauthenticated count leak
+`next.config.ts:3` has `X-Frame-Options DENY`, `X-Content-Type-Options nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security 63072000` `next.config.ts:12` — sound for HAProxy. No `CSP`. `src/app/api/unread/route.ts:5` `GET` returns `{count}` with no auth (`Cache-Control: no-store` correct) — leaks only unread volume, by design for public `EjerLoginBadge` poll, but should be documented.
+
+#### M3 — Backup includes password hash and is memory-buffered
+`src/app/api/backup/route.ts:9` `isLoggedIn()` 401 else zip; `src/app/api/backup/route.ts:14` `readdir data/` filter `.json`, `src/app/api/backup/route.ts:21` includes `data/password.json` (included by design per owner). Hash is `sha256` hex, low cost. `src/app/api/backup/route.ts:50` `zip.generateAsync({DEFLATE level6})` buffers entire backup in heap + per-file `readFile` `src/app/api/backup/route.ts:26,41` — no size/stream limit, no rate-limit — repeated `GET /api/backup` can OOM (e.g., 100×6MB). `Cache-Control: no-store` present `src/app/api/backup/route.ts:56`, HSTS ensures HTTPS, but zip at-rest must be encrypted.
+**Fix:** Stream zip (`generateNodeStream`), add size cap, rate-limit `GET /api/backup` (e.g., 1/min/IP), document at-rest handling; optionally encrypt zip or exclude `password.json` with opt-in flag (owner chose include — keep with warning).
+
+---
+
+## Findings — Data
+
+### HIGH
+
+#### H3 — Lost-update race on all JSON stores
+`src/lib/db.ts:38` `save()` is `writeFile tmp→rename` atomic per file, but call-sites are `load→modify→save` without lock: `src/app/admin/actions.ts:129` `upsertService`, `src/app/admin/actions.ts:185` `addGalleryItem`, `src/app/(site)/contact/actions.ts:93` `submitContact` (vs `src/app/admin/actions.ts:309` `setMessageRead`). Two concurrent admins: A loads v1, B loads v1, A saves v2, B saves v3 overwriting v2 — A's gallery/message lost. Same for `services.json`/`messages.json`/`site.json`.
+**Fix:** File lock (`open ... 'wx'` lockfile) or optimistic `etag`/version field, serialize with `async-mutex`.
+
+#### H4 — Non-atomic image write + non-transactional DB+file ordering
+`src/lib/storage.ts:59` `fsp.writeFile(path.join(UPLOADS_DIR,filename),bytes)` direct, no `tmp→rename`, no `fsync`. Crash leaves partial image listed by `src/lib/media.ts:14` and served with `Cache-Control immutable` `src/app/uploads/[...path]/route.ts:36` — poisoned cache. `src/app/admin/actions.ts:262` `removeGalleryImage` does `splice`+`deleteStoredImage` `src/lib/storage.ts:65` then `saveGallery` `src/app/admin/actions.ts:277` — if `saveGallery` fails (disk full, swallowing `catch{}` `src/lib/db.ts:28`), file already deleted but DB still references it → broken image. `src/app/admin/actions.ts:298` `deleteGalleryItem` and `src/app/admin/actions.ts:329` `addGalleryItemFromMedia` have same ordering. `src/app/admin/actions.ts:425` `uploadMedia` loops `saveUpload` without rollback (unlike `addGalleryItem` `src/app/admin/actions.ts:230` `Promise.all(saved.map(deleteStoredImage))`).
+**Fix:** `saveUpload` via `tmp→rename` + `bytes.length` check (not `file.size` `src/lib/storage.ts:47`) + `randomUUID` vs `Date.now`+`Math.random`, `fsync`; order `saveGallery` before `unlink`; `uploadMedia` rollback on partial fail.
+
+### MEDIUM
+
+#### M4 — Media orphan detection gaps
+`src/lib/media.ts:20` allowlist `/^[\w.-]+\.(jpg|jpeg|png|webp|gif)$/i` vs `src/app/uploads/[...path]/route.ts:24` `/^[\w-]+\.(jpg...)$/i` (disallows `.`/`_`), vs `src/lib/storage.ts:56` `slugify` names — mismatch: `my_photo.v2.jpg` listed but 404 via route and undeletable as orphan? `src/lib/media.ts:14` filters `.tmp`/`.corrupt`/`.svg`/spaces → invisible orphans never counted, leaked forever. `src/lib/media.ts:40` `getUsedPaths` only tracks `heroImage`/`aboutImage` (`src/lib/db.ts:50` site) + `gallery.images` (`src/lib/db.ts:73`) — ignores future `SiteSettings` image fields, and `uploads/...` without leading `/` false-positive. `src/lib/db.ts:25` corrupt `site.json=null` spread throws outside `load` try, leaving `used` empty → `src/components/admin/MediaManagerClient.tsx:44` shows bulk delete that would nuke everything via `src/app/admin/actions.ts:457` `deleteOrphanMedia` snapshot TOCTOU (file becomes used between `listMediaWithStatus` and loop `deleteStoredImage`).
+**Fix:** Align regexes, include `.tmp` clean-up on startup, expand `getUsedPaths` to all image fields, re-check `used` per file before `unlink`, handle `load` shape validation.
+
+#### M5 — Corrupt JSON silent reseed + single `.corrupt` backup
+`src/lib/db.ts:25` distinguishes `ENOENT` vs parse error → `rename(target, target+".corrupt")` `src/lib/db.ts:27` before reseeding — correct, but `rename` overwrites existing `.corrupt` (single generation) and both `rename` and fallback `writeFile` are `try{}catch{}` `src/lib/db.ts:28,32` — disk-full hidden, caller gets in-memory defaults while disk stays broken. `src/lib/auth.ts:34` `saveStoredHash` does direct `writeFile` without `tmp→rename` — truncated hash falls back to `ADMIN_PASSWORD` via `loadStoredHash` `src/lib/auth.ts:23` validation `^[a-f0-9]{64}$`, silent credential revert. No `fsync` anywhere.
+**Fix:** `tmp→rename` + `fsync` for all writes, version `.corrupt` with timestamp, surface disk errors.
+
+### LOW
+
+#### L1 — Backup incompleteness and stale snapshot
+`src/app/api/backup/route.ts:21` flat `readdir` only, nested `uploads/subfolder` ignored (and `src/app/uploads/[...path]/route.ts:22` rejects `segments.length!==1`). `.corrupt` files excluded (`endsWith(".json")` false for `.json.corrupt`), `data/*.tmp` temp not included — recovery loses evidence. Reads race `save()` `src/lib/db.ts:42` `rename` — backup may be `gallery.json` v2 + `site.json` v1 inconsistent.
+
+#### L2 — Upload size and naming quirks
+`src/lib/storage.ts:47` checks `file.size` (attacker-controllable header) not `bytes.length` `src/lib/storage.ts:48` after `arrayBuffer()`. `src/lib/storage.ts:56` `Date.now36+Math.random` no existence check, low collision risk — use `randomUUID()`. `next.config.ts:18` `bodySizeLimit 8mb` vs `src/lib/storage.ts:13` `MAX_BYTES 6MB` — 20×`uploadMedia` would exceed 8MB and be rejected at framework before per-file 6MB logic, inconsistent UX.
+
+#### L3 — Orphan graph TOCTOU on bulk delete
+`src/app/admin/actions.ts:457` `deleteOrphanMedia` snapshots `listMediaWithStatus` then loops `deleteStoredImage` without re-checking `getUsedPaths` per file — concurrent gallery add could make file used after snapshot then deleted.
+
+---
+
+## Verified working (security + data, with evidence)
+
+| Area | Check | Result |
+|---|---|---|
+| Auth | `src/lib/auth.ts:68` HMAC-SHA256, `timingSafeEqual` `src/lib/auth.ts:43` dual passwords (server `ADMIN_PASSWORD` + ejer `data/password.json`) both accepted, `src/lib/auth.ts:23` `/^[a-f0-9]{64}$/` | ✓ |
+| Session | `src/lib/auth.ts:93` `Secure` via `X-Forwarded-Proto`, `httpOnly`, `SameSite=Lax`, `7d`, `isLoggedIn` guards all `requireAdmin` in `src/app/admin/actions.ts:309` etc. | ✓ |
+| Throttle | `src/lib/login-throttle.ts:8` 5/10m→15m via `x-forwarded-for` `src/app/admin/actions.ts:37` | ✓ (in-memory, XFF caveat above) |
+| Headers | `next.config.ts:12` `Strict-Transport-Security 63072000; includeSubDomains; preload` on `/(.*)`, `X-Frame-Options DENY` | ✓ |
+| Build | `npm run build` | ✓ Compiled, 16 routes, `/api/backup` 138B |
+| Backup auth | `GET /api/backup` unauth 401, auth 200 `application/zip` with `data/password.json` included per design, `no-store` | ✓ |
+| Storage | `src/lib/storage.ts:15` magic-sniff `FF D8 FF`/`89 50 4E 47`/`RIFF…WEBP`/`GIF87a` ignores `file.type`, `src/lib/storage.ts:65` `startsWith("/uploads/")` + `startsWith(UPLOADS_DIR)` | ✓ |
+| DB | `src/lib/db.ts:27` `.corrupt` on parse error, `structuredClone` `src/lib/db.ts:34`, `tmp→rename` `src/lib/db.ts:42` | ✓ (single-gen + no fsync caveat above) |
+
+## Recommended order
+
+1. Add file lock / `async-mutex` around `load→modify→save` in `src/lib/db.ts:38` and call-sites (`src/app/admin/actions.ts:158`, `src/app/(site)/contact/actions.ts:93`).
+2. Make `src/lib/storage.ts:59` + `src/lib/auth.ts:34` atomic `tmp→rename` + `bytes.length` check + `randomUUID` + `fsync`; reorder `removeGalleryImage` `src/app/admin/actions.ts:262` to `saveGallery` before `unlink`; add rollback to `uploadMedia` `src/app/admin/actions.ts:425`.
+3. Harden throttles: persist to file/Redis or enforce at HAProxy; sanitize `X-Forwarded-For` to last trusted proxy.
+4. Backup: stream `jszip` (`generateNodeStream`), add size/rate limit, document at-rest handling for included `password.json` (owner chose include — keep with warning to store zip encrypted).
+5. Align `src/lib/media.ts:20` / `src/app/uploads/[...path]/route.ts:24` regexes, expand orphan coverage, re-check `used` per file in `src/app/admin/actions.ts:457`.
+
+---
+
+## History
+
+Previous audit 23 August 2026 (high `H1` zero commits, `H2` silent gallery, `H3` no throttle, `M1` corrupt overwrite, `M2` MIME-only, `M4` no honeypot, etc.) — all marked fixed in `AUDIT.md:133` and re-verified above as still sound. `H1` now `bbd8480`/`f784ebd` `master` has commits. `I4` default `ADMIN_PASSWORD=changeme` `src/lib/auth.ts:11` still ships — rotate before prod per `README.md`.
+
+## Remediation log — 25 August 2026 (new, security + data scope)
+
+| ID | Severity | Finding | Fix / Note |
+|---|---|---|---|
+| S1 | Medium (by design) | Backup includes `data/password.json` sha256 per owner request | Keep included with warning: store `mlh-sevi-backup-*.zip` encrypted at rest; hash is unsalted `src/lib/auth.ts:39` |
+| S2 | High (residual) | In-memory throttles + XFF spoof | Document HAProxy sanitization; consider persistent store |
+| D1 | High | Lost-update race `db.ts:38` | Add lock/mutex — not yet fixed |
+| D2 | High | Non-atomic image write + DB+file ordering | Use `tmp→rename` and save DB before unlink — not yet fixed |
+
+---
+
+## Previous audit — 23 August 2026 (retained)
+
 # Project Audit — Handyman Website (Danish)
 
 **Date:** 23 August 2026
@@ -163,3 +284,4 @@ No CSP, `X-Frame-Options`, `X-Content-Type-Options`, or HSTS. Irrelevant on loca
 | F2 | Medium (user-reported) | **Line breaks in service/gallery/CTA texts collapsed on the site.** Browsers default to `white-space: normal`, and no render site preserved newlines from admin textareas (form submissions send CRLF). | `whitespace-pre-line` added to every user-editable text render site (service cards on home + services page, gallery lightbox captions, bottom CTA). `str()` now normalizes CRLF → LF on save for consistent storage. **E2E-proven:** multiline description saved via action POST renders with raw `\n` in HTML source; test data reverted afterwards. |
 | F3 | Enhancement (user-requested) | Lightbox text could overflow without scrolling, and browsing between photos relied solely on arrow buttons. | Caption area capped at `max-h-28` with `overflow-y-auto` (long texts scroll, image stays put); thumbnail strip below the caption shows a sliding window of up to 5 images (click to jump, active ring-highlighted); overlay itself scrolls on small screens; arrows/keyboard navigation unchanged. Bundle verified to ship the new markup; lint + build clean. |
 | F4 | Feature rework (user-requested) | **Gallery model was 1 image per entry** — uploading a "new image" just replaced or jumped to another job. Desired: each gallery section = one completed job with text and **up to 5 images**. | Data model changed to `images: string[]` with automatic migration of existing single-image data (`loadGallery` normalizes old `image` field). Admin: new-project form takes 1–5 files; each job card shows its thumbnails with per-image ✕ delete (last image warns that the whole job goes), "Tilføj billeder" with live slot counter (max 5 enforced server-side), texts editable separately. Public: job cards show cover image + image count badge; lightbox now flips **within the job's own images** (arrows, keyboard, thumbnail strip, "2 / 5" counter) while title/description stay fixed. **E2E-proven** (11-point action-POST suite): create with 2 → add 3 → 6th rejected → remove 1 → public render → delete; orphaned uploads cleaned; owner's live data restored untouched. |
+
