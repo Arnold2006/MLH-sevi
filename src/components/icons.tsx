@@ -266,6 +266,17 @@ export function LogOutIcon(props: IconProps) {
   );
 }
 
+export function KeyIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="8" cy="11" r="5" />
+      <path d="m13.5 13.5 5 5" />
+      <path d="m18 18 1 1" />
+      <path d="M15 14a2 2 0 0 0 2-2" />
+    </svg>
+  );
+}
+
 export function ExternalLinkIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

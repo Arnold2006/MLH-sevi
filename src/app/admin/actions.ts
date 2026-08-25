@@ -6,7 +6,9 @@ import { headers } from "next/headers";
 import {
   checkPassword,
   endSession,
+  isUsingStoredPassword,
   requireAdmin,
+  setStoredPassword,
   startSession,
 } from "@/lib/auth";
 import { isLockedOut, registerFailure, resetAttempts } from "@/lib/login-throttle";
@@ -43,7 +45,7 @@ export async function login(
     };
   }
   const password = String(formData.get("password") ?? "");
-  if (!checkPassword(password)) {
+  if (!(await checkPassword(password))) {
     registerFailure(ip);
     return { error: "Forkert adgangskode. Prøv igen." };
   }
@@ -55,6 +57,33 @@ export async function login(
 export async function logout() {
   await endSession();
   redirect("/admin/login");
+}
+
+export interface PasswordState {
+  ok?: boolean;
+  error?: string;
+}
+
+export async function changePassword(
+  _prev: PasswordState,
+  formData: FormData
+): Promise<PasswordState> {
+  await requireAdmin();
+  const current = String(formData.get("current") ?? "").trim();
+  const next = String(formData.get("newPassword") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "").trim();
+  if (!current || !next || !confirm) return { error: "Udfyld alle felter." };
+  if (!(await checkPassword(current))) return { error: "Nuværende adgangskode er forkert." };
+  if (next.length < 8) return { error: "Ny adgangskode skal være mindst 8 tegn." };
+  if (next.length > 100) return { error: "Ny adgangskode er for lang (max 100)." };
+  if (next !== confirm) return { error: "Gentag adgangskode matcher ikke." };
+  await setStoredPassword(next);
+  await startSession();
+  return { ok: true };
+}
+
+export async function getPasswordStatus(): Promise<{ usingStored: boolean }> {
+  return { usingStored: await isUsingStoredPassword() };
 }
 
 function str(formData: FormData, key: string, max = 500): string {

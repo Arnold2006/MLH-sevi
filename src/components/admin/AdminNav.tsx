@@ -6,6 +6,7 @@ import {
   HomeIcon,
   ImageIcon,
   InboxIcon,
+  KeyIcon,
   SlidersIcon,
   WrenchIcon,
 } from "@/components/icons";
@@ -17,6 +18,7 @@ const NAV = [
   { href: "/admin/media", label: "Medier", icon: ImageIcon },
   { href: "/admin/settings", label: "Indstillinger", icon: SlidersIcon },
   { href: "/admin/messages", label: "Beskeder", icon: InboxIcon },
+  { href: "/admin/password", label: "Adgangskode", icon: KeyIcon },
 ];
 
 function isActive(pathname: string, href: string) {
