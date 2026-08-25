@@ -54,7 +54,7 @@ export default async function AboutPage() {
           {[
             {
               icon: ShieldCheckIcon,
-              value: "Autoriseret & forsikret",
+              value: "Professionel og omhyggelig",
               label: "Alle opgaver er fuldt dækket",
             },
             {

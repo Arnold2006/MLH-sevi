@@ -93,7 +93,7 @@ export default async function HomePage() {
           {[
             {
               icon: ShieldCheckIcon,
-              title: "Autoriseret & forsikret",
+              title: "Professionel og omhyggelig",
               sub: "Fuld tryghed ved alle opgaver",
             },
             {
