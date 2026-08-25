@@ -316,6 +316,7 @@ export async function setMessageRead(formData: FormData) {
   msg.read = read;
   await saveMessages(messages);
   revalidatePath("/admin", "layout");
+  revalidatePath("/", "layout");
 }
 
 export async function addGalleryItemFromMedia(
@@ -383,6 +384,7 @@ export async function deleteMessage(formData: FormData) {
   const messages = await loadMessages();
   await saveMessages(messages.filter((m) => m.id !== id));
   revalidatePath("/admin", "layout");
+  revalidatePath("/", "layout");
 }
 
 export interface MediaState {

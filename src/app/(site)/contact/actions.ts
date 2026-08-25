@@ -102,5 +102,6 @@ export async function submitContact(
   });
   await saveMessages(messages);
   revalidatePath("/admin", "layout");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
