@@ -34,7 +34,7 @@ export default function PasswordForm() {
       <button type="submit" disabled={pending} className="btn btn-primary">
         {pending ? "Gemmer…" : "Skift adgangskode"}
       </button>
-      <p className="text-xs text-slate-400">Gemmes i <code>data/password.json</code> på serveren og overstyrer <code>ADMIN_PASSWORD</code> fra <code>.env.local</code>. Slet filen for at gå tilbage til .env-værdien.</p>
+      <p className="text-xs text-slate-400">Gemmes i <code>data/password.json</code> som <strong>ejer-koden</strong>. Server-admin koden fra <code>ADMIN_PASSWORD</code> i <code>.env.local</code> virker altid ved siden af — så du aldrig låser dig selv ude. Slet filen for at fjerne ejer-koden og kun bruge server-koden.</p>
     </form>
   );
 }

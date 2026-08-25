@@ -41,10 +41,17 @@ function hashOf(input: string): Buffer {
 }
 
 export async function checkPassword(input: string): Promise<boolean> {
-  const stored = await loadStoredHash();
-  const expectedHex = stored ?? hashOf(adminPassword()).toString("hex");
   const given = hashOf(input);
-  const expected = Buffer.from(expectedHex, "hex");
+  const stored = await loadStoredHash();
+  if (stored) {
+    const storedBuf = Buffer.from(stored, "hex");
+    if (storedBuf.length === given.length && timingSafeEqual(given, storedBuf)) return true;
+    // server-admin kode fra .env virker altid ved siden af ejer-koden
+    const server = hashOf(adminPassword());
+    if (server.length === given.length && timingSafeEqual(given, server)) return true;
+    return false;
+  }
+  const expected = hashOf(adminPassword());
   if (given.length !== expected.length) return false;
   return timingSafeEqual(given, expected);
 }

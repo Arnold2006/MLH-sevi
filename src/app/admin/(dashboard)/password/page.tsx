@@ -8,15 +8,15 @@ export default async function AdminPasswordPage() {
     <>
       <PageHeader
         title="Adgangskode"
-        description="Skift koden du bruger på /admin/login. Kræver at du kender den nuværende kode."
+        description="Skift ejer-koden til /admin/login. Server-admin koden fra .env.local virker altid — du kan logge ind med begge."
       />
       {usingStored ? (
         <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200 ring-inset">
-          Der ligger allerede en kode gemt i <code>data/password.json</code> på serveren — den overstyrer <code>.env.local</code>.
+          Ejer-kode gemt i <code>data/password.json</code> — login accepterer både ejer-koden og server-koden (<code>ADMIN_PASSWORD</code> fra <code>.env.local</code>).
         </p>
       ) : (
         <p className="mb-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 ring-inset">
-          Ingen kode gemt endnu — login bruger <code>ADMIN_PASSWORD</code> fra <code>.env.local</code> (pt. “changeme” hvis ikke ændret).
+          Ingen ejer-kode gemt endnu — login bruger kun server-koden <code>ADMIN_PASSWORD</code> fra <code>.env.local</code>.
         </p>
       )}
       <PasswordForm />
