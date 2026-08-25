@@ -184,7 +184,7 @@ export default async function HomePage() {
           <div>
             <p className="eyebrow">Hvorfor vælge {site.businessName}</p>
             <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Professionelt håndværk. Personlig service.
+              {site.homeWhyTitle || "Professionelt håndværk. Personlig service."}
             </h2>
             <div className="mt-5 space-y-4 leading-7 text-slate-600">
               {site.aboutText
@@ -195,12 +195,15 @@ export default async function HomePage() {
                 ))}
             </div>
             <ul className="mt-6 space-y-3">
-              {[
-                "Gratis og uforpligtende tilbud",
-                "Gulve beskyttes og roden ryddes op – ved hver eneste opgave",
-                "De fleste projekter færdige i ét besøg",
-                "Mødestabil, autoriseret og fuldt forsikret",
-              ].map((point) => (
+              {(site.homeWhyBullets
+                ? site.homeWhyBullets.split("\n").map((s) => s.trim()).filter(Boolean)
+                : [
+                    "Gratis og uforpligtende tilbud",
+                    "Gulve beskyttes og roden ryddes op – ved hver eneste opgave",
+                    "De fleste projekter færdige i ét besøg",
+                    "Mødestabil, autoriseret og fuldt forsikret",
+                  ]
+              ).map((point) => (
                 <li key={point} className="flex items-start gap-3 text-sm text-slate-700">
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
                     <CheckIcon className="h-3 w-3" />

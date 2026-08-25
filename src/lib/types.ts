@@ -14,6 +14,8 @@ export interface SiteSettings {
   aboutText: string;
   aboutImage: string;
   aboutImagePosition: string;
+  homeWhyTitle: string;
+  homeWhyBullets: string;
   statYears: string;
   statJobs: string;
   ctaHeadline: string;

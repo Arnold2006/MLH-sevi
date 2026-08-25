@@ -19,6 +19,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     "Jeg startede Summit Håndværkerservice i 2011 efter mere end ti år i byggebranchen. Det begyndte med weekendopgaver for naboerne, men er siden vokset til en komplet håndværkervirksomhed – filosofien er dog præcis den samme: mød til tiden, sig en fair pris, lav kvalitetsarbejde, og efterlad hver bolig pænere, end jeg fandt den.\n\nNår du hyrer Summit, får du mig – ikke en roterende stab af underentreprenører. Jeg står inde for hver eneste opgave med et enkelt løfte: Er du ikke tilfreds med arbejdet, retter jeg det.\n\nNår jeg ikke står på stigen, træner jeg sønnens fodboldhold, strejfer rundt i byggemarkedet eller planlægger mit næste haveprojekt.",
   aboutImage: "/images/about.svg",
   aboutImagePosition: "50% 50%",
+  homeWhyTitle: "Professionelt håndværk. Personlig service.",
+  homeWhyBullets:
+    "Gratis og uforpligtende tilbud\nGulve beskyttes og roden ryddes op – ved hver eneste opgave\nDe fleste projekter færdige i ét besøg\nMødestabil, autoriseret og fuldt forsikret",
   statYears: "15+",
   statJobs: "2.400+",
   ctaHeadline: "Klar til at strege det af listen?",
