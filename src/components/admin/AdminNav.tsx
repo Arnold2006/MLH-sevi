@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin", label: "Oversigt", icon: HomeIcon },
   { href: "/admin/services", label: "Ydelser", icon: WrenchIcon },
   { href: "/admin/gallery", label: "Galleri", icon: ImageIcon },
+  { href: "/admin/media", label: "Medier", icon: ImageIcon },
   { href: "/admin/settings", label: "Indstillinger", icon: SlidersIcon },
   { href: "/admin/messages", label: "Beskeder", icon: InboxIcon },
 ];
