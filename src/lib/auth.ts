@@ -1,9 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { promises as fsp } from "fs";
+import path from "path";
 
 const COOKIE_NAME = "handyman_admin";
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const PASSWORD_FILE = path.join(process.cwd(), "data", "password.json");
 
 function adminPassword(): string {
   return process.env.ADMIN_PASSWORD || "changeme";
@@ -17,10 +20,49 @@ function secret(): string {
   );
 }
 
-export function checkPassword(input: string): boolean {
-  const given = createHash("sha256").update(input).digest();
-  const expected = createHash("sha256").update(adminPassword()).digest();
+async function loadStoredHash(): Promise<string | null> {
+  try {
+    const raw = await fsp.readFile(PASSWORD_FILE, "utf8");
+    const j = JSON.parse(raw) as { hash?: string };
+    if (typeof j.hash === "string" && /^[a-f0-9]{64}$/i.test(j.hash)) return j.hash.toLowerCase();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveStoredHash(hashHex: string): Promise<void> {
+  await fsp.mkdir(path.dirname(PASSWORD_FILE), { recursive: true });
+  await fsp.writeFile(PASSWORD_FILE, JSON.stringify({ hash: hashHex.toLowerCase() }, null, 2), "utf8");
+}
+
+function hashOf(input: string): Buffer {
+  return createHash("sha256").update(input).digest();
+}
+
+export async function checkPassword(input: string): Promise<boolean> {
+  const given = hashOf(input);
+  const stored = await loadStoredHash();
+  if (stored) {
+    const storedBuf = Buffer.from(stored, "hex");
+    if (storedBuf.length === given.length && timingSafeEqual(given, storedBuf)) return true;
+    // server-admin kode fra .env virker altid ved siden af ejer-koden
+    const server = hashOf(adminPassword());
+    if (server.length === given.length && timingSafeEqual(given, server)) return true;
+    return false;
+  }
+  const expected = hashOf(adminPassword());
+  if (given.length !== expected.length) return false;
   return timingSafeEqual(given, expected);
+}
+
+export async function setStoredPassword(newPassword: string): Promise<void> {
+  const hex = hashOf(newPassword).toString("hex");
+  await saveStoredHash(hex);
+}
+
+export async function isUsingStoredPassword(): Promise<boolean> {
+  return (await loadStoredHash()) !== null;
 }
 
 function sign(payload: string): string {
