@@ -1,6 +1,6 @@
 import Header from "@/components/site/Header";
 import Footer from "@/components/site/Footer";
-import { loadSite } from "@/lib/db";
+import { loadMessages, loadSite } from "@/lib/db";
 
 export default async function SiteLayout({
   children,
@@ -8,6 +8,11 @@ export default async function SiteLayout({
   children: React.ReactNode;
 }) {
   const site = await loadSite();
+  let unreadCount = 0;
+  try {
+    const messages = await loadMessages();
+    unreadCount = messages.filter((m) => !m.read).length;
+  } catch {}
   return (
     <>
       <a
@@ -20,7 +25,7 @@ export default async function SiteLayout({
       <main id="indhold" className="flex-1">
         {children}
       </main>
-      <Footer site={site} />
+      <Footer site={site} unreadCount={unreadCount} />
     </>
   );
 }

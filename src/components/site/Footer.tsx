@@ -8,7 +8,7 @@ import {
   WrenchIcon,
 } from "@/components/icons";
 
-export default function Footer({ site }: { site: SiteSettings }) {
+export default function Footer({ site, unreadCount = 0 }: { site: SiteSettings; unreadCount?: number }) {
   const year = new Date().getFullYear();
   return (
     <footer className="bg-slate-900 text-slate-300">
@@ -88,8 +88,16 @@ export default function Footer({ site }: { site: SiteSettings }) {
           <p>
             © {year} {site.businessName}. Alle rettigheder forbeholdes.
           </p>
-          <Link href="/admin/login" className="hover:text-slate-300">
+          <Link href="/admin/login" className="relative inline-flex items-center gap-1.5 hover:text-slate-300">
             Ejer-login
+            {unreadCount > 0 ? (
+              <span
+                aria-label={`${unreadCount} ulæste beskeder`}
+                className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white ring-2 ring-slate-900"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            ) : null}
           </Link>
         </div>
       </div>
