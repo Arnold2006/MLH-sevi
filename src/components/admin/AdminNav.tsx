@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  DownloadIcon,
   HomeIcon,
   ImageIcon,
   InboxIcon,
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/admin/settings", label: "Indstillinger", icon: SlidersIcon },
   { href: "/admin/messages", label: "Beskeder", icon: InboxIcon },
   { href: "/admin/password", label: "Adgangskode", icon: KeyIcon },
+  { href: "/admin/backup", label: "Backup", icon: DownloadIcon },
 ];
 
 function isActive(pathname: string, href: string) {
