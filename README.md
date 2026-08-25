@@ -1,4 +1,4 @@
-# Summit Håndværkerservice — Hjemmeside
+# MLH-sevi — Hjemmeside
 
 A clean, professional website for a local handyman business, with a built-in
 admin area so the owner can update everything themselves — no coding required.
