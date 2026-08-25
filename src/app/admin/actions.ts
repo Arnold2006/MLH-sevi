@@ -99,6 +99,8 @@ export async function saveSettings(
     aboutText: str(formData, "aboutText", 8000),
     aboutImage: str(formData, "aboutImage", 300) || current.aboutImage,
     aboutImagePosition: parsePosition(str(formData, "aboutImagePosition", 20)) || current.aboutImagePosition || "50% 50%",
+    homeWhyTitle: str(formData, "homeWhyTitle", 200) || current.homeWhyTitle || "Professionelt håndværk. Personlig service.",
+    homeWhyBullets: str(formData, "homeWhyBullets", 2000) || current.homeWhyBullets || "",
     statYears: str(formData, "statYears", 20),
     statJobs: str(formData, "statJobs", 20),
     ctaHeadline: str(formData, "ctaHeadline", 200),

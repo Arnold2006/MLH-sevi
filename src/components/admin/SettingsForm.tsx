@@ -110,6 +110,27 @@ export default function SettingsForm({
         <ImageField name="aboutImage" label="Foto til Om-sektionen" value={site.aboutImage} positionValue={site.aboutImagePosition} />
       </Section>
 
+      <Section
+        title="Forside — 'Hvorfor vælge os' (billedet du markerede)"
+        hint="Titel og de 4 grønne punkt-tegn under historien på forsiden. Én per linje."
+      >
+        <div>
+          <label htmlFor="homeWhyTitle" className="label">Overskrift</label>
+          <input id="homeWhyTitle" name="homeWhyTitle" defaultValue={site.homeWhyTitle} className="input" placeholder="Professionelt håndværk. Personlig service." />
+        </div>
+        <div>
+          <label htmlFor="homeWhyBullets" className="label">Punkt-tegn (én per linje)</label>
+          <textarea
+            id="homeWhyBullets"
+            name="homeWhyBullets"
+            rows={5}
+            defaultValue={site.homeWhyBullets}
+            className="input resize-y"
+            placeholder={"Gratis og uforpligtende tilbud\nGulve beskyttes og roden ryddes op – ved hver eneste opgave\nDe fleste projekter færdige i ét besøg\nMødestabil, autoriseret og fuldt forsikret"}
+          />
+        </div>
+      </Section>
+
       <Section title="Statistik & call-to-action">
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
