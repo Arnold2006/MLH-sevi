@@ -26,8 +26,10 @@ function Section({
 
 export default function SettingsForm({
   site,
+  mediaFiles,
 }: {
   site: import("@/lib/types").SiteSettings;
+  mediaFiles: { path: string; filename: string }[];
 }) {
   const [state, action, pending] = useActionState(saveSettings, initial);
 
@@ -92,7 +94,7 @@ export default function SettingsForm({
           <label htmlFor="heroSubtext" className="label">Underoverskrift</label>
           <textarea id="heroSubtext" name="heroSubtext" rows={3} defaultValue={site.heroSubtext} className="input resize-y" />
         </div>
-        <ImageField name="heroImage" label="Hero-billede" value={site.heroImage} positionValue={site.heroImagePosition} />
+        <ImageField name="heroImage" label="Hero-billede" value={site.heroImage} positionValue={site.heroImagePosition} mediaFiles={mediaFiles} />
       </Section>
 
       <Section
@@ -107,7 +109,7 @@ export default function SettingsForm({
           <label htmlFor="aboutText" className="label">Historien</label>
           <textarea id="aboutText" name="aboutText" rows={8} defaultValue={site.aboutText} className="input resize-y" />
         </div>
-        <ImageField name="aboutImage" label="Foto til Om-sektionen" value={site.aboutImage} positionValue={site.aboutImagePosition} />
+        <ImageField name="aboutImage" label="Foto til Om-sektionen" value={site.aboutImage} positionValue={site.aboutImagePosition} mediaFiles={mediaFiles} />
       </Section>
 
       <Section

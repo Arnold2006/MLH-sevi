@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, useCallback } from "react";
 import { uploadImage } from "@/app/admin/actions";
 import { ImageIcon, UploadIcon } from "@/components/icons";
+import MediaPicker from "./MediaPicker";
 
 function parsePos(raw: string | undefined): [number, number] {
   const m = (raw || "").trim().match(/^(\d{1,3})%?\s+(\d{1,3})%?$/);
@@ -18,12 +19,14 @@ export default function ImageField({
   value,
   positionName,
   positionValue,
+  mediaFiles,
 }: {
   name: string;
   label: string;
   value: string;
   positionName?: string;
   positionValue?: string;
+  mediaFiles?: { path: string; filename: string }[];
 }) {
   const posName = positionName || `${name}Position`;
   const [path, setPath] = useState(value);
@@ -32,6 +35,7 @@ export default function ImageField({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -148,12 +152,33 @@ export default function ImageField({
           <UploadIcon className="h-3.5 w-3.5" />
           {pending ? "Uploader…" : path ? "Udskift billede" : "Upload billede"}
         </button>
+        {mediaFiles && mediaFiles.length > 0 ? (
+          <button type="button" onClick={() => setShowPicker((v) => !v)} className="btn btn-outline btn-sm">
+            {showPicker ? "Luk bibliotek" : "Vælg fra Mediebibliotek"}
+          </button>
+        ) : null}
         {path ? (
           <span className="truncate text-xs text-slate-400" title={path}>
             {path}
           </span>
         ) : null}
       </div>
+      {showPicker && mediaFiles ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+          <p className="mb-2 text-xs font-medium text-slate-600">Vælg fra Mediebiblioteket — tidligere uploads</p>
+          <MediaPicker
+            files={mediaFiles}
+            max={1}
+            selected={path ? [path] : []}
+            onToggle={(p) => {
+              setPath(p);
+              setPos([50, 50]);
+              setShowPicker(false);
+            }}
+          />
+          <a href="/admin/media" target="_blank" className="mt-2 inline-block text-xs text-amber-600 underline">Åbn Mediebibliotek i ny fane</a>
+        </div>
+      ) : null}
       {error ? <p className="mt-1.5 text-xs text-red-600">{error}</p> : null}
       <input
         ref={fileRef}

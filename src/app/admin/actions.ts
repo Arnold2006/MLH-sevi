@@ -318,10 +318,117 @@ export async function setMessageRead(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+export async function addGalleryItemFromMedia(
+  _prev: GalleryState,
+  formData: FormData
+): Promise<GalleryState> {
+  await requireAdmin();
+  const title = str(formData, "title", 120);
+  if (!title) return { error: "Angiv en titel til projektet." };
+  const paths = formData.getAll("mediaPaths").map((v) => String(v).trim()).filter((p) => p.startsWith("/uploads/"));
+  if (paths.length === 0) return { error: "Vælg mindst ét billede fra Mediebiblioteket." };
+  if (paths.length > MAX_GALLERY_IMAGES) return { error: `Maks ${MAX_GALLERY_IMAGES} billeder pr. projekt.` };
+  const { promises: fsp2 } = await import("fs");
+  const { default: path2 } = await import("path");
+  const uploads = path2.join(process.cwd(), "public", "uploads");
+  for (const p of paths) {
+    const full = path2.join(process.cwd(), "public", p.replace(/^\//, ""));
+    if (!full.startsWith(uploads)) return { error: "Ugyldig filsti." };
+    try {
+      await fsp2.stat(full);
+    } catch {
+      return { error: `Filen findes ikke: ${p}` };
+    }
+  }
+  const items = await loadGallery();
+  items.unshift({ id: uid(), images: [...new Set(paths)], title, description: str(formData, "description", 1000), category: str(formData, "category", 40) || "Andet", addedAt: new Date().toISOString() });
+  await saveGallery(items);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function addGalleryImagesFromMedia(
+  _prev: GalleryState,
+  formData: FormData
+): Promise<GalleryState> {
+  await requireAdmin();
+  const id = str(formData, "id", 80);
+  const items = await loadGallery();
+  const item = items.find((i) => i.id === id);
+  if (!item) return { error: "Projektet blev ikke fundet." };
+  const paths = formData.getAll("mediaPaths").map((v) => String(v).trim()).filter((p) => p.startsWith("/uploads/"));
+  if (paths.length === 0) return { error: "Vælg mindst ét billede fra Mediebiblioteket." };
+  const slots = MAX_GALLERY_IMAGES - item.images.length;
+  if (slots <= 0) return { error: `Projektet har allerede ${MAX_GALLERY_IMAGES} billeder.` };
+  if (paths.length > slots) return { error: `Der er kun plads til ${slots} flere billede${slots === 1 ? "" : "r"}.` };
+  const unique = [...new Set(paths)].filter((p) => !item.images.includes(p));
+  if (unique.length === 0) return { error: "Billederne er allerede i projektet." };
+  const { promises: fsp2 } = await import("fs");
+  const { default: path2 } = await import("path");
+  const uploads = path2.join(process.cwd(), "public", "uploads");
+  for (const p of unique.slice(0, slots)) {
+    const full = path2.join(process.cwd(), "public", p.replace(/^\//, ""));
+    if (!full.startsWith(uploads)) return { error: "Ugyldig filsti." };
+    try { await fsp2.stat(full); } catch { return { error: `Filen findes ikke: ${p}` }; }
+  }
+  item.images.push(...unique.slice(0, slots));
+  await saveGallery(items);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function deleteMessage(formData: FormData) {
   await requireAdmin();
   const id = str(formData, "id", 80);
   const messages = await loadMessages();
   await saveMessages(messages.filter((m) => m.id !== id));
   revalidatePath("/admin", "layout");
+}
+
+export interface MediaState {
+  ok?: boolean;
+  error?: string;
+  uploaded?: number;
+}
+
+export async function uploadMedia(
+  _prev: MediaState,
+  formData: FormData
+): Promise<MediaState> {
+  await requireAdmin();
+  const files = filesFrom(formData, "files");
+  if (files.length === 0) return { error: "Vælg mindst ét billede." };
+  if (files.length > 20) return { error: "Maks 20 billeder ad gangen." };
+  let count = 0;
+  for (const file of files) {
+    try {
+      await saveUpload(file, "medier");
+      count++;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Upload mislykkedes." };
+    }
+  }
+  revalidatePath("/admin/media", "page");
+  return { ok: true, uploaded: count };
+}
+
+export async function deleteMedia(formData: FormData) {
+  await requireAdmin();
+  const p = str(formData, "path", 300);
+  if (!p.startsWith("/uploads/")) return;
+  const { getUsedPaths } = await import("@/lib/media");
+  const used = await getUsedPaths();
+  if (used.has(p)) return;
+  await deleteStoredImage(p);
+  revalidatePath("/admin/media", "page");
+}
+
+export async function deleteOrphanMedia() {
+  await requireAdmin();
+  const { listMediaWithStatus } = await import("@/lib/media");
+  const items = await listMediaWithStatus();
+  for (const f of items.filter((x) => !x.used)) {
+    await deleteStoredImage(f.path);
+  }
+  revalidatePath("/admin/media", "page");
 }
